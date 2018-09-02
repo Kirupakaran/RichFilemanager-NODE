@@ -18,6 +18,8 @@ paths.posix = require('path-posix');
 const router = express.Router(); // eslint-disable-line
 const upload = multer({dest: 'public/'});
 
+const gcloud = require('./gcloud-utils');
+
 module.exports = (__appRoot, configPath) => { // eslint-disable-line max-statements
 	//Init config
 	if ( typeof( configPath ) == "string" ) {
@@ -28,7 +30,7 @@ module.exports = (__appRoot, configPath) => { // eslint-disable-line max-stateme
 	}
 
 	// finally, our main route handling that calls the above functions :)
-	router.get('/', (req, res) => { // eslint-disable-line complexity
+	router.get('/', async (req, res) => { // eslint-disable-line complexity
 		const mode = req.query.mode;
 		const path = req.query.path;
 
@@ -40,7 +42,14 @@ module.exports = (__appRoot, configPath) => { // eslint-disable-line max-stateme
                         type: mode ,
                         attributes: {
                             config: {
-                                security: config.security,
+                                security: {
+									readOnly: false,
+									extensions: {
+										policy: 'DISALLOW_LIST',
+										ignoreCase: true,
+										restrictions: []
+									}
+								},
                                 upload: config.upload
                             }
                         }
@@ -48,22 +57,17 @@ module.exports = (__appRoot, configPath) => { // eslint-disable-line max-stateme
 				});
 			break;
 			case 'getinfo':
-				parsePath(path, (pp) => {
-					getinfo(pp, (result) => {
-						respond(res, {
-							data: result
-						});
-					}); // getinfo
-				}); // parsePath
+				var results = await gcloud.get(path);				
+				respond(res, {
+						data: results
+				});
 			break;
 			case 'readfolder':
-				parsePath(path, (pp) => {
-					readfolder(pp, (result) => {
-						respond(res, {
-							data: result
-						});
-					}); // readfolder
-				}); // parsePath
+				var folderPath = path == '/' ? '' : path;
+				var results = await gcloud.get(folderPath);				
+				respond(res, {
+						data: results
+				});
 			break;
 			case 'getimage':
 				parsePath(path, (pp) => {
@@ -71,17 +75,15 @@ module.exports = (__appRoot, configPath) => { // eslint-disable-line max-stateme
 				}); // parsePath
 			break;
 			case 'readfile':
-				parsePath(path, (pp) => {
-					res.sendFile(paths.resolve(pp.osFullPath));
-				}); // parsePath
+				//const file = await gcloud.getFile(path);				
+				res.sendFile();
 			break;
 			case 'download':
-				parsePath(path, (pp) => {
-					res.setHeader('content-type', 'text/html; charset=UTF-8');
-					res.setHeader('content-description', 'File Transfer');
-					res.setHeader('content-disposition', 'attachment; filename="' + pp.filename + '"');
-					res.sendFile(paths.resolve(pp.osFullPath));
-				}); // parsePath
+			const file = await gcloud.getFile(path);
+				res.setHeader('content-type', 'text/html; charset=UTF-8');
+				res.setHeader('content-description', 'File Transfer');
+				res.setHeader('content-disposition', 'attachment; filename="' + file.name + '"');
+				res.sendFile(file);
 			break;
 			case 'addfolder':
 				parsePath(path, (pp) => {
@@ -150,7 +152,6 @@ module.exports = (__appRoot, configPath) => { // eslint-disable-line max-stateme
 	router.post('/', upload.array('files', config.upload.maxNumberOfFiles), (req, res) => {
 		const mode = req.body.mode;
 		const path = req.body.path;
-		console.log( req.body );
 		switch (mode.trim()) {
 			case 'upload':
 				parsePath(req.body.path, (pp) => {
@@ -287,20 +288,6 @@ module.exports = (__appRoot, configPath) => { // eslint-disable-line max-stateme
 		};
 		callback(result);
 	} // directoryInfo
-
-	// Getting information is different for a file than it is for a directory, so here
-	// we make sure we are calling the right function.
-	function getinfo(pp, callback) {
-		if (pp.isDirectory) {
-			directoryInfo(pp, (result) => {
-				callback(result);
-			});
-		} else {
-			fileInfo(pp, (result) => {
-				callback(result);
-			});
-		} // if
-	} // getinfo
 
 	// Here we get the information for a folder, which is a content listing
 
