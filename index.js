@@ -57,14 +57,14 @@ module.exports = (__appRoot, configPath) => { // eslint-disable-line max-stateme
 				});
 			break;
 			case 'getinfo':
-				var results = await gcloud.get(path);				
+				var results = await gcloud.list(path);				
 				respond(res, {
 						data: results
 				});
 			break;
 			case 'readfolder':
 				var folderPath = path == '/' ? '' : path;
-				var results = await gcloud.get(folderPath);				
+				var results = await gcloud.list(folderPath);				
 				respond(res, {
 						data: results
 				});
@@ -75,11 +75,11 @@ module.exports = (__appRoot, configPath) => { // eslint-disable-line max-stateme
 				}); // parsePath
 			break;
 			case 'readfile':
-				//const file = await gcloud.getFile(path);				
+				//const file = await gcloud.listFile(path);				
 				res.sendFile();
 			break;
 			case 'download':
-			const file = await gcloud.getFile(path);
+			const file = await gcloud.listFile(path);
 				res.setHeader('content-type', 'text/html; charset=UTF-8');
 				res.setHeader('content-description', 'File Transfer');
 				res.setHeader('content-disposition', 'attachment; filename="' + file.name + '"');

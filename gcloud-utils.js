@@ -58,5 +58,5 @@ async function list(path) {
 
 module.exports = {
     create,
-    get
+    list
 };
