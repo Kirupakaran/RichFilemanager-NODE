@@ -18,9 +18,19 @@ async function create(file, path) {
     return response;
 }
 
+async function download(file) {
+    const response = await storage
+        .bucket(bucket)
+        .file(file)
+        .download();
+
+    return response[0];
+}
+
 async function list(path) {
     var options = {};
-    if (path) {
+    if (path && path != '/') {
+        path = path.startsWith('/') ? path.substr(1) + '/' : path;
         options = {
             prefix: path
         };
@@ -34,7 +44,7 @@ async function list(path) {
     response[0].forEach(f => {
         const type = f.name.endsWith('/') ? 'folder': 'file';
         var name = '';
-        if (type == 'folder') {
+        if (type == 'folder') { 
             name = f.name.split('/').reverse()[1];
         } else {
             name = f.name.substring(f.name.lastIndexOf('/') + 1);
@@ -44,17 +54,31 @@ async function list(path) {
             type: type,
             attributes: {
                 name: name,
+                path: f.name,
                 readable: 1,
                 writable: 1
             }
         };
-        files.push(file);
-    });
 
+        if (!isSubfolder(f.name, path)) {
+            if (path != f.name) {
+                files.push(file);
+            }
+        }
+    });
+    console.log(files);
     return files;
+}
+
+function isSubfolder(folder, path) {
+    const relativeName = path ? folder.substr(path.length + 1) : folder;
+    const subfolder = relativeName.match(/\//g);
+    if (subfolder != null && subfolder.length > 1) return true;
+    return false;
 }
 
 module.exports = {
     create,
-    list
+    list,
+    download
 };

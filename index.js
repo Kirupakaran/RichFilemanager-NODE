@@ -11,9 +11,7 @@ TODO: API functions to integrate
 var config;
 const express = require('express');
 const fs = require('fs');
-const paths = require('path');
 const multer = require('multer');
-paths.posix = require('path-posix');
 
 const router = express.Router(); // eslint-disable-line
 const upload = multer({dest: 'public/'});
@@ -59,52 +57,52 @@ module.exports = (__appRoot, configPath) => { // eslint-disable-line max-stateme
 			case 'getinfo':
 				var results = await gcloud.list(path);				
 				respond(res, {
-						data: results
+					data: results
 				});
 			break;
 			case 'readfolder':
-				var folderPath = path == '/' ? '' : path;
-				var results = await gcloud.list(folderPath);				
+				var results = await gcloud.list(path);				
 				respond(res, {
-						data: results
+					data: results
 				});
 			break;
 			case 'getimage':
-				parsePath(path, (pp) => {
-					res.sendFile(paths.resolve(pp.osFullPath));
-				}); // parsePath
+				var file = await gcloud.download(path);				
+				res.sendFile(file);
 			break;
 			case 'readfile':
-				//const file = await gcloud.listFile(path);				
-				res.sendFile();
+				var file = await gcloud.download(path);				
+				res.sendFile(file);
 			break;
 			case 'download':
-			const file = await gcloud.listFile(path);
+				var file = await gcloud.download(path);
 				res.setHeader('content-type', 'text/html; charset=UTF-8');
 				res.setHeader('content-description', 'File Transfer');
 				res.setHeader('content-disposition', 'attachment; filename="' + file.name + '"');
 				res.sendFile(file);
 			break;
 			case 'addfolder':
-				parsePath(path, (pp) => {
+				/*parsePath(path, (pp) => {
 					addfolder(pp, req.query.name, (result) => {
 						respond(res, {
 							data: result
 						});
 					}); // addfolder
 				}); // parsePath
+				*/
 			break;
 			case 'delete':
-				parsePath(path, (pp) => {
+				/*parsePath(path, (pp) => {
 					deleteItem(pp, (result) => {
 						respond(res, {
 							data: result
 						});
 					}); // parsePath
 				}); // parsePath
+				*/
 			break;
 			case 'rename':
-				parsePath(req.query.old, (opp) => {
+				/*parsePath(req.query.old, (opp) => {
 					const newPath = paths.posix.parse(opp.uiPath)
 						.dir;
 					const newish = paths.posix.join(newPath, req.query.new);
@@ -117,9 +115,10 @@ module.exports = (__appRoot, configPath) => { // eslint-disable-line max-stateme
 						}); // rename
 					}); // parseNewPath
 				}); // parsePath
+				*/
 			break;
 			case 'move':
-				parsePath(req.query.old, (opp) => {
+				/*parsePath(req.query.old, (opp) => {
 					parseNewPath(paths.posix.join('/', req.query.new, opp.filename), (npp) => {
 						rename(opp, npp, (result) => {
 							respond(res, {
@@ -128,9 +127,10 @@ module.exports = (__appRoot, configPath) => { // eslint-disable-line max-stateme
 						}); // rename
 					}); // parseNewPath
 				}); // parsePath
+				*/
 			break;
 			case 'copy':
-				parsePath(req.query.source, (opp) => {
+				/*parsePath(req.query.source, (opp) => {
 					parseNewPath(paths.posix.join('/', req.query.target, opp.filename), (npp) => {
 						copy(opp, npp, (result) => {
 							respond(res, {
@@ -139,6 +139,7 @@ module.exports = (__appRoot, configPath) => { // eslint-disable-line max-stateme
 						}); // rename
 					}); // parseNewPath
 				}); // parsePath
+				*/
 			break;
 			default:
 				// eslint-disable-next-line no-console
@@ -154,16 +155,17 @@ module.exports = (__appRoot, configPath) => { // eslint-disable-line max-stateme
 		const path = req.body.path;
 		switch (mode.trim()) {
 			case 'upload':
-				parsePath(req.body.path, (pp) => {
+				/*parsePath(req.body.path, (pp) => {
 					savefiles(pp, req.files, (result) => {
 						respond(res, {
 							data: result
 						});
 					}); // savefiles
 				}); // parsePath
+				*/
 			break;
 			case 'savefile':
-				parsePath(path, (pp) => {
+				/*parsePath(path, (pp) => {
 					getinfo(pp, (result) => {
 						fs.writeFile(paths.resolve(pp.osFullPath), req.body.content, (error) => {
 							if (error) {
@@ -183,6 +185,7 @@ module.exports = (__appRoot, configPath) => { // eslint-disable-line max-stateme
 						});
 					}); // getinfo
 				}); // parsePath
+				*/
 			break;
 			default:
 				// eslint-disable-next-line no-console
@@ -204,52 +207,6 @@ module.exports = (__appRoot, configPath) => { // eslint-disable-line max-stateme
 			Code: -1,
 		}; // return
 	} // errors
-
-	// This is a seperate function because branch new files are uploaded and won't have an existing file
-	// to get information from
-	function parseNewPath(inputPath, callback) {
-		let path = inputPath;
-		const parsedPath = {};
-		const fileRoot = config.options.fileRoot || '';
-		parsedPath.uiPath = path;
-
-		// if the passed in path isn't in the fileRoot path, make it so
-		// This should go away and every path should be relative to the fileRoot
-		if (path.substring(0, fileRoot.length) !== fileRoot) {
-			path = paths.posix.join(fileRoot, path);
-		}
-
-		parsedPath.relativePath = paths.posix.normalize(path);
-		parsedPath.filename = paths.posix.basename(parsedPath.relativePath);
-		parsedPath.osRelativePath = paths.normalize(path);
-		parsedPath.osExecutionPath = __appRoot;
-		parsedPath.osFullPath = paths.join(parsedPath.osExecutionPath, parsedPath.osRelativePath);
-		parsedPath.osFullDirectory = paths.parse(parsedPath.osFullPath)
-			.dir;
-		callback(parsedPath);
-	} // parseNewPath
-
-	// because of windows, we are going to start by parsing out all the needed path information
-	// this will include original values, as well as OS specific values
-	function parsePath(path, callback) {
-		parseNewPath(path, (parsedPath) => {
-			fs.stat(parsedPath.osFullPath, (err, stats) => {
-				if (err) {
-					callback(errors(err));
-				} else if (stats.isDirectory()) {
-					parsedPath.isDirectory = true;
-					parsedPath.stats = stats;
-					callback(parsedPath);
-				} else if (stats.isFile()) {
-					parsedPath.isDirectory = false;
-					parsedPath.stats = stats;
-					callback(parsedPath);
-				} else {
-					callback(errors(err));
-				}
-			});
-		}); // parseNewPath
-	} // parsePath
 
 	// This function will create the return object for a file.  This keeps it consistent and
 	// adheres to the DRY principle
@@ -294,124 +251,26 @@ module.exports = (__appRoot, configPath) => { // eslint-disable-line max-stateme
 	// This function exists merely to capture the index and and pp(parsedPath) information in the for loop
 	// otherwise the for loop would finish before our async functions
 	function getIndividualFileInfo(pp, files, loopInfo, callback, $index) {
-		parsePath(paths.posix.join(pp.uiPath, files[$index]), (ipp) => {
-			getinfo(ipp, (result) => {
-				loopInfo.results.push(result);
-				if (loopInfo.results.length === loopInfo.total) {
-					callback(loopInfo.results);
-				} // if
-			}); // getinfo
-		}); // parsePath
+
 	} // getIndividualFileInfo
 
 	function readfolder(pp, callback) {
-		fs.readdir(pp.osFullPath, (err, files) => {
-			if (err) {
-				console.log('err -> ', err); // eslint-disable-line no-console
-				callback(errors(err));
-			} else {
-				const loopInfo = {
-					results: [],
-					total: files.length,
-				};
-
-				if (loopInfo.total === 0) {
-					callback(loopInfo.results);
-				}
-
-				for (let i = 0; i < loopInfo.total; i++) {
-					getIndividualFileInfo(pp, files, loopInfo, callback, i);
-				} // for
-			} // if
-		}); // fs.readdir
+		
 	} // getinfo
 
 	// function to delete a file/folder
 	function deleteItem(pp, callback) {
-		if (pp.isDirectory === true) {
-			fs.rmdir(pp.osFullPath, (err) => {
-				if (err) {
-					callback(errors(err));
-				} else {
-					directoryInfo(pp, callback);
-				} // if
-			}); // fs.rmdir
-		} else {
-			fs.unlink(pp.osFullPath, (err) => {
-				if (err) {
-					callback(errors(err));
-				} else {
-					fileInfo(pp, callback);
-				} // if
-			}); // fs.unlink
-		} // if
+		
 	} // deleteItem
 
 	// function to add a new folder
 	function addfolder(pp, name, callback) {
-		fs.mkdir(paths.join(pp.osFullPath, name), (err) => {
-			if (err) {
-				callback(errors(err));
-			} else {
-				const result = {
-					id: `${pp.relativePath}${name}/`,
-					type: 'folder',
-					attributes: {
-						name,
-						created: pp.stats.birthtime,
-						modified: pp.stats.mtime,
-						path: `${pp.relativePath}${name}/`,
-						readable: 1,
-						writable: 1,
-						timestamp: '',
-					},
-				};
-				callback(result);
-			} // if
-		}); // fs.mkdir
+		
 	} // addfolder
 
 	// function to save uploaded files to their proper locations
 	function renameIndividualFile(loopInfo, files, pp, callback, $index) {
-		if (loopInfo.error === false) {
-			// const oldfilename = paths.join(__appRoot, files[$index].path);
-			const oldfilename = paths.resolve(files[$index].path);
-			// new files comes with a directory, replaced files with a filename.  I think there is a better way to handle this
-			// but this works as a starting point
-			const newfilename = paths.join(
-				__appRoot,
-				pp.isDirectory ? pp.relativePath : '',
-				pp.isDirectory ? files[$index].originalname : pp.filename
-			); // not sure if this is the best way to handle this or not
-
-			fs.rename(oldfilename, newfilename, (err) => {
-				if (err) {
-					loopInfo.error = true;
-					console.log('savefiles error -> ', err); // eslint-disable-line no-console
-					callback(errors(err));
-					return;
-				}
-				const name = paths.parse(newfilename)
-					.base;
-				const result = {
-					id: `${pp.relativePath}${name}`,
-					type: 'file',
-					attributes: {
-						name,
-						created: pp.stats.birthtime,
-						modified: pp.stats.mtime,
-						path: `${pp.relativePath}${name}`,
-						readable: 1,
-						writable: 1,
-						timestamp: '',
-					},
-				};
-				loopInfo.results.push(result);
-				if (loopInfo.results.length === loopInfo.total) {
-					callback(loopInfo.results);
-				}
-			}); // fs.rename
-		} // if not loop error
+		
 	} // renameIndividualFile
 
 	function savefiles(pp, files, callback) {
@@ -430,60 +289,12 @@ module.exports = (__appRoot, configPath) => { // eslint-disable-line max-stateme
 
 	// function to rename files
 	function rename(old, newish, callback) {
-		fs.rename(old.osFullPath, newish.osFullPath, (err) => {
-			if (err) {
-				callback(errors(err));
-			} else {
-				const name = paths.parse(newish.osFullPath)
-					.base;
-				const result = {
-					id: `${newish.relativePath}`,
-					type: 'file',
-					attributes: {
-						name,
-						created: '',
-						modified: '',
-						path: `${newish.relativePath}`,
-						readable: 1,
-						writable: 1,
-						timestamp: '',
-					},
-				};
-				callback(result);
-			} // if
-		}); // fs.rename
+		
 	} // rename
 
 	// function to copy files
 	function copy(source, target, callback) {
-		fs.readFile(source.osFullPath, (err, file) => {
-			if (err) {
-				callback(errors(err));
-				return;
-			}
-			fs.writeFile(target.osFullPath, file, (error) => {
-				if (err) {
-					callback(errors(error));
-					return;
-				}
-				const name = paths.parse(target.osFullPath)
-					.base;
-				const result = {
-					id: `${target.relativePath}`,
-					type: 'file',
-					attributes: {
-						name,
-						created: '',
-						modified: '',
-						path: `${target.relativePath}`,
-						readable: 1,
-						writable: 1,
-						timestamp: '',
-					},
-				};
-				callback(result);
-			});
-		});
+		
 	} // copy
 
 	// RichFilemanager expects a pretified string and not a json object, so this will do that
