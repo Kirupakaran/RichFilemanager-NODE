@@ -1,7 +1,5 @@
 // Imports the Google Cloud client library
 const Storage = require('@google-cloud/storage');
-require('dotenv').config()
-
 const projectId = process.env.GCLOUD_PROJECT_ID;
 const bucket = process.env.GCLOUD_BUCKET;
 
