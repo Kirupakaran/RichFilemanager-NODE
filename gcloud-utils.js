@@ -1,30 +1,48 @@
 // Imports the Google Cloud client library
 const Storage = require('@google-cloud/storage');
 const projectId = process.env.GCLOUD_PROJECT_ID;
-const bucket = process.env.GCLOUD_BUCKET;
-
+const bucketName = process.env.GCLOUD_BUCKET;
+const fs = require('fs');
+var mkdirp = require('mkdirp');
 
 // Creates a client
 const storage = new Storage({
   projectId: projectId,
 });
 
-async function create(file, path) {
-    const response = await storage
-        .bucket(bucket)
-        .upload(file, {
-            destination: path + file,
-        });
+const bucket = storage.bucket(bucketName);
+
+async function upload(path, files) {
+    const promises = [];
+    files.forEach(file => {
+        const promise = new Promise((resolve, reject) => {
+            return bucket.upload(file, {
+                destination: path + file,
+            });
+        })
+        promises.push(promise);
+    });
+
+    const response = await Promise.all(promises);
     return response;
 }
 
 async function download(file) {
-    const response = await storage
-        .bucket(bucket)
+    if (!fs.existsSync('public/temp/' + file)) {
+        if (file.indexOf('/') != -1) {
+            mkdirp.sync('public/temp/' + file.substring(0, file.lastIndexOf('/')));
+        }
+        const response = await bucket
         .file(file)
-        .download({validation: false});
-
-    return response[0];
+        .download({
+            destination: 'public/temp/' + file,
+            validation: false
+        });
+        return response[0];
+    }
+    else {
+        return fs.readFileSync('public/temp/' + file);
+    }
 }
 
 async function list(path) {
@@ -36,9 +54,7 @@ async function list(path) {
         };
     }
 
-    const response = await storage
-        .bucket(bucket)
-        .getFiles(options);
+    const response = await bucket.getFiles(options);
 
     const files = [];
     response[0].forEach(f => {
@@ -54,7 +70,7 @@ async function list(path) {
             type: type,
             attributes: {
                 name: name,
-                path: f.name,
+                path: '/' + f.name,
                 readable: 1,
                 writable: 1
             }
@@ -69,6 +85,22 @@ async function list(path) {
     return files;
 }
 
+async function createFolder(path, name) {
+    const folder = await bucket.file(path + name + '/').save('');
+    
+    const response = {
+        id: path + name + '/',
+        type: 'folder',
+        attributes: {
+            name: name,
+            path: path + name + '/',
+            readable: 1,
+            writable: 1
+        }
+    };
+    return response;
+}
+
 function isSubfolder(folder, path) {
     const relativeName = path ? folder.substr(path.length + 1) : folder;
     const subfolder = relativeName.match(/\//g);
@@ -81,8 +113,9 @@ function getName(path) {
 }
 
 module.exports = {
-    create,
+    upload,
+    createFolder,
     list,
     download,
-    getName
+    getName,
 };

@@ -11,13 +11,12 @@ TODO: API functions to integrate
 var config;
 const express = require('express');
 const fs = require('fs');
-const multer = require('multer');
 const mime = require('mime');
-
+const inspect = require('util').inspect;
 const router = express.Router(); // eslint-disable-line
-const upload = multer({dest: 'public/'});
 
 const gcloud = require('./gcloud-utils');
+const Busboy = require('busboy');
 
 module.exports = (__appRoot, configPath) => { // eslint-disable-line max-statements
 	//Init config
@@ -85,14 +84,10 @@ module.exports = (__appRoot, configPath) => { // eslint-disable-line max-stateme
 				res.send(file);
 			break;
 			case 'addfolder':
-				/*parsePath(path, (pp) => {
-					addfolder(pp, req.query.name, (result) => {
-						respond(res, {
-							data: result
-						});
-					}); // addfolder
-				}); // parsePath
-				*/
+				var folder = await gcloud.createFolder(path, req.query.name);
+				respond(res, {
+					data: folder
+				});
 			break;
 			case 'delete':
 				/*parsePath(path, (pp) => {
@@ -128,7 +123,7 @@ module.exports = (__appRoot, configPath) => { // eslint-disable-line max-stateme
 								data: result
 							});
 						}); // rename
-					}); // parseNewPath
+					}body); // parseNewPath
 				}); // parsePath
 				*/
 			break;
@@ -153,11 +148,51 @@ module.exports = (__appRoot, configPath) => { // eslint-disable-line max-stateme
 		} // switch
 	}); // get
 
-	router.post('/', upload.array('files', config.upload.maxNumberOfFiles), (req, res) => {
-		const mode = req.body.mode;
-		const path = req.body.path;
+	router.post('/', async (req, res) => {
+		var busboy = new Busboy({headers: req.headers});
+		const fields = {};
+		const files = [];
+
+		busboy.on('file', function(fieldname, file, filename, encoding, mimetype) {
+			var fileObj = {
+				name: filename,
+				encoding: encoding,
+				mimetype: mimetype
+			};
+			var fileChunks = [];
+			console.log('file', filename);
+			file.on('data', function(data) {
+			  fileChunks.push(data);
+			});
+			file.on('end', function() {
+			  fileObj.file = Buffer.concat(fileChunks);
+			  files.push(fileObj);
+			});
+		});
+		busboy.on('field', function(fieldname, val, fieldnameTruncated, valTruncated, encoding, mimetype) {
+			console.log('field', fieldname);
+			field[fieldname] = inspect(val);
+		});
+		busboy.on('finish', function() {
+			var response = processPost(fields, files, res);
+			res.setHeader('Content-Type', 'application/json');
+			res.send(JSON.stringify(response));
+			res.end();
+		});
+	});
+
+	async function processPost(fields, files) {
+		console.log(fields);
+		const mode = fields.mode;
+		const path = fields.path;
+		
+		var response;
 		switch (mode.trim()) {
 			case 'upload':
+				var response = await gcloud.upload(path, files);
+				response = {
+					data: response
+				};
 				/*parsePath(req.body.path, (pp) => {
 					savefiles(pp, req.files, (result) => {
 						respond(res, {
@@ -197,7 +232,9 @@ module.exports = (__appRoot, configPath) => { // eslint-disable-line max-stateme
 					Code: 0
 				});
 		} // switch
-	}); // post
+
+		return response;
+	} // post
 
 
 
