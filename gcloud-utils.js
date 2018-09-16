@@ -22,7 +22,7 @@ async function download(file) {
     const response = await storage
         .bucket(bucket)
         .file(file)
-        .download();
+        .download({validation: false});
 
     return response[0];
 }
@@ -66,7 +66,6 @@ async function list(path) {
             }
         }
     });
-    console.log(files);
     return files;
 }
 
@@ -77,8 +76,13 @@ function isSubfolder(folder, path) {
     return false;
 }
 
+function getName(path) {
+    return path.substring(path.lastIndexOf('/') + 1);
+}
+
 module.exports = {
     create,
     list,
-    download
+    download,
+    getName
 };

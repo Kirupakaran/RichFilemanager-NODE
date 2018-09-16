@@ -12,6 +12,7 @@ var config;
 const express = require('express');
 const fs = require('fs');
 const multer = require('multer');
+const mime = require('mime');
 
 const router = express.Router(); // eslint-disable-line
 const upload = multer({dest: 'public/'});
@@ -67,19 +68,21 @@ module.exports = (__appRoot, configPath) => { // eslint-disable-line max-stateme
 				});
 			break;
 			case 'getimage':
-				var file = await gcloud.download(path);				
-				res.sendFile(file);
+				var file = await gcloud.download(path);
+				res.send(file);
 			break;
 			case 'readfile':
 				var file = await gcloud.download(path);				
-				res.sendFile(file);
+				res.send(file);
 			break;
 			case 'download':
 				var file = await gcloud.download(path);
-				res.setHeader('content-type', 'text/html; charset=UTF-8');
+				var name = gcloud.getName(path);
+				var mimeType = mime.getType(name);
+				res.setHeader('content-type', mimeType);
 				res.setHeader('content-description', 'File Transfer');
-				res.setHeader('content-disposition', 'attachment; filename="' + file.name + '"');
-				res.sendFile(file);
+				res.setHeader('content-disposition', 'attachment; filename="' + name + '"');
+				res.send(file);
 			break;
 			case 'addfolder':
 				/*parsePath(path, (pp) => {
