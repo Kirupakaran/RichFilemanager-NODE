@@ -16,7 +16,6 @@ const inspect = require('util').inspect;
 const router = express.Router(); // eslint-disable-line
 
 const gcloud = require('./gcloud-utils');
-const Busboy = require('busboy');
 
 module.exports = (__appRoot, configPath) => { // eslint-disable-line max-statements
 	//Init config
@@ -149,47 +148,22 @@ module.exports = (__appRoot, configPath) => { // eslint-disable-line max-stateme
 	}); // get
 
 	router.post('/', async (req, res) => {
-		var busboy = new Busboy({headers: req.headers});
-		const fields = {};
-		const files = [];
+		const fields = req.body;
+		const files = req.files;
 
-		busboy.on('file', function(fieldname, file, filename, encoding, mimetype) {
-			var fileObj = {
-				name: filename,
-				encoding: encoding,
-				mimetype: mimetype
-			};
-			var fileChunks = [];
-			console.log('file', filename);
-			file.on('data', function(data) {
-			  fileChunks.push(data);
-			});
-			file.on('end', function() {
-			  fileObj.file = Buffer.concat(fileChunks);
-			  files.push(fileObj);
-			});
-		});
-		busboy.on('field', function(fieldname, val, fieldnameTruncated, valTruncated, encoding, mimetype) {
-			console.log('field', fieldname);
-			field[fieldname] = inspect(val);
-		});
-		busboy.on('finish', function() {
-			var response = processPost(fields, files, res);
-			res.setHeader('Content-Type', 'application/json');
-			res.send(JSON.stringify(response));
-			res.end();
-		});
+		var response = await processPost(fields, files, res);
+		res.setHeader('Content-Type', 'application/json');
+		res.send(response);
 	});
 
 	async function processPost(fields, files) {
-		console.log(fields);
 		const mode = fields.mode;
 		const path = fields.path;
 		
 		var response;
 		switch (mode.trim()) {
 			case 'upload':
-				var response = await gcloud.upload(path, files);
+				var response = await gcloud.upload(path, files.files);
 				response = {
 					data: response
 				};

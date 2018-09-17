@@ -12,19 +12,24 @@ const storage = new Storage({
 
 const bucket = storage.bucket(bucketName);
 
-async function upload(path, files) {
-    const promises = [];
-    files.forEach(file => {
-        const promise = new Promise((resolve, reject) => {
-            return bucket.upload(file, {
-                destination: path + file,
-            });
-        })
-        promises.push(promise);
+async function upload(path, file) {
+    path = path == '/' ? '': path;
+
+    const response = await bucket.upload(file.path, {
+        destination: path + file.originalname,
     });
 
-    const response = await Promise.all(promises);
-    return response;
+    var data = [{
+        id: '/' + path + file.originalname,
+        type: 'file',
+        attributes: {
+            name: file.originalname,
+            path: '/' + path + file.originalname,
+            readable: 1,
+            writable: 1
+        }
+    }];
+    return data;
 }
 
 async function download(file) {
