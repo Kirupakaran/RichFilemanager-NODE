@@ -80,6 +80,7 @@ async function list(path) {
         const file = {
             id: f.name,
             type: type,
+            gcloudUrl: getGCloudUrl(f.name),
             attributes: {
                 name: name,
                 path: '/' + f.name,
@@ -87,10 +88,6 @@ async function list(path) {
                 writable: 1
             }
         };
-
-        if (type == 'file') {
-            file.gcloudUrl = getGCloudUrl(f.name);
-        }
         
         if (!isSubfolder(f.name, path)) {
             if (path != f.name) {
