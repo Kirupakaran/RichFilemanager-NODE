@@ -12,23 +12,30 @@ const storage = new Storage({
 
 const bucket = storage.bucket(bucketName);
 
-async function upload(path, file) {
-    path = path == '/' ? '': path;
+function getGCloudUrl(name) {
+    return 'https://storage.cloud.google.com/dreamteam-dev/' + name;
+}
 
+function getData(path, name, gcloudUrl, type) {
+    return {
+        id: path + name,
+        type: type,
+        gcloudUrl: getGCloudUrl(name),
+        attributes: {
+            name: name,
+            path: path + name,
+            readable: 1,
+            writable: 1
+        }
+    };
+}
+
+async function upload(path, file) {
     const response = await bucket.upload(file.path, {
         destination: path + file.originalname,
     });
 
-    var data = [{
-        id: '/' + path + file.originalname,
-        type: 'file',
-        attributes: {
-            name: file.originalname,
-            path: '/' + path + file.originalname,
-            readable: 1,
-            writable: 1
-        }
-    }];
+    var data = [getData(path, file.originalname, 'file')];
     return data;
 }
 
@@ -81,6 +88,10 @@ async function list(path) {
             }
         };
 
+        if (type == 'file') {
+            file.gcloudUrl = getGCloudUrl(f.name);
+        }
+        
         if (!isSubfolder(f.name, path)) {
             if (path != f.name) {
                 files.push(file);
